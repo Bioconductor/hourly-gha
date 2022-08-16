@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: '3.x'
       - name: Install dependencies
-        run: python -m pip install "git+https://github.com/CloudVE/cloudbridge@os_app_creds_support#egg=cloudbridge[full]"
+        run: python -m pip install "git+https://github.com/CloudVE/cloudbridge#egg=cloudbridge[full]"
       - uses: actions/checkout@v3
 
       - run: |
@@ -26,6 +26,9 @@ jobs:
           git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/js2-reports.git
           mv jetstream2/reports/instances.txt js2-reports/jetstream2/reports/instances.txt
           cd js2-reports/
+          git stash
+          git pull origin main || git reset --hard origin/main
+          git stash pop
           git config --global --add safe.directory "$GITHUB_WORKSPACE/js2-reports"
           git config user.name github-actions
           git config user.email github-actions@github.com
@@ -57,6 +60,9 @@ jobs:
           git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/js2-reports.git
           mv jetstream2/reports/k8s/prodk8s.charts js2-reports/jetstream2/reports/k8s/prodk8s.charts
           cd js2-reports/
+          git stash
+          git pull origin main || git reset --hard origin/main
+          git stash pop
           git config --global --add safe.directory "$GITHUB_WORKSPACE/js2-reports"
           git config user.name github-actions
           git config user.email github-actions@github.com
@@ -88,6 +94,9 @@ jobs:
           git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/js2-reports.git
           mv jetstream2/reports/k8s/yescure.charts js2-reports/jetstream2/reports/k8s/yescure.charts
           cd js2-reports/
+          git stash
+          git pull origin main || git reset --hard origin/main
+          git stash pop
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name github-actions
           git config user.email github-actions@github.com
