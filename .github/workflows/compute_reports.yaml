@@ -1,0 +1,96 @@
+name: Report instance usage
+
+on: 
+  workflow_dispatch: {}
+  schedule:
+    - cron: '*/60 * * * *'
+
+jobs:
+  reportcompute:
+    name: Report instance usage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: python -m pip install "git+https://github.com/CloudVE/cloudbridge@os_app_creds_support#egg=cloudbridge[full]"
+      - uses: actions/checkout@v3
+
+      - run: |
+          mkdir -p jetstream2/reports;
+          python jetstream2/scripts/get_os_overview.py -i ${{secrets.OS_APP_ID}} -s ${{secrets.OS_APP_SECRET}} -r jetstream2/reports/instances.txt;
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && cat jetstream2/reports/instances.txt) > jetstream2/reports/tmpinstances.txt && mv jetstream2/reports/tmpinstances.txt jetstream2/reports/instances.txt;
+
+      - run: |
+          git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/js2-reports.git
+          mv jetstream2/reports/instances.txt js2-reports/jetstream2/reports/instances.txt
+          cd js2-reports/
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/js2-reports"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git commit -m "Update JS2 VMs report $(echo $(date +'%m-%d-%y-%H-%M-%S'))"
+          git push
+
+  reportprodk8scharts:
+    name: Report helm charts for prodk8s cluster
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Helm
+        run: curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+
+      - name: save kubeconfig
+        shell: bash
+        run: mkdir -p ~/.kube && echo "${{ secrets.PRODK8S_KUBECONFIG }}" > ~/.kube/config
+
+      - name: Install Kubectl
+        run: curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl" && chmod +x ./kubectl && sudo mv ./kubectl /usr/local/bin/kubectl && kubectl version
+
+      - run: |
+          mkdir -p jetstream2/reports/k8s;
+          echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" > jetstream2/reports/k8s/prodk8s.charts
+          helm ls -a -A | awk '{print $2}' | tail -n+2 | sort | uniq | xargs -i bash -c "helm ls -a -n {} && echo ''" >> jetstream2/reports/k8s/prodk8s.charts
+
+      - run: |
+          git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/js2-reports.git
+          mv jetstream2/reports/k8s/prodk8s.charts js2-reports/jetstream2/reports/k8s/prodk8s.charts
+          cd js2-reports/
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/js2-reports"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git commit -m "Update k8sprod Chart list $(echo $(date +'%m-%d-%y-%H-%M-%S'))"
+          git push
+
+  reportyescurecharts:
+    name: Report helm charts for yescure cluster
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Helm
+        run: curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+
+      - name: save kubeconfig
+        shell: bash
+        run: mkdir -p ~/.kube && echo "${{ secrets.YESCURE_KUBECONFIG }}" > ~/.kube/config
+
+      - name: Install Kubectl
+        run: curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl" && chmod +x ./kubectl && sudo mv ./kubectl /usr/local/bin/kubectl && kubectl version
+
+      - run: |
+          mkdir -p jetstream2/reports/k8s;
+          echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" > jetstream2/reports/k8s/yescure.charts
+          helm ls -a -A | awk '{print $2}' | tail -n+2 | sort | uniq | xargs -i bash -c "helm ls -a -n {} && echo ''" >> jetstream2/reports/k8s/yescure.charts
+
+      - run: |
+          git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/js2-reports.git
+          mv jetstream2/reports/k8s/yescure.charts js2-reports/jetstream2/reports/k8s/yescure.charts
+          cd js2-reports/
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git commit -m "Update YESCURE Chart list $(echo $(date +'%m-%d-%y-%H-%M-%S'))"
+          git push
