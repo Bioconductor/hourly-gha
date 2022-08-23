@@ -1,4 +1,4 @@
-name: Report RClone ls
+name: Update BiocStorage reports
 on:
   workflow_dispatch: {}
   schedule:
@@ -8,7 +8,7 @@ jobs:
   cloudbridgejs2:
     container:
       image: python:3.10
-    name: Archive diff
+    name: Cloudbridge js2 update
     runs-on: ubuntu-latest
     steps:
       - name: Add cloudbridge conf file
@@ -28,7 +28,7 @@ jobs:
 
       - run: |
           git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/BiocStorage.git
-          mv reports/ BiocStorage/reports
+          mv reports BiocStorage/reports
           cd BiocStorage/
           for i in {1..3};
             do
@@ -46,7 +46,7 @@ jobs:
   rclonels:
     container:
       image: rclone/rclone:latest
-    name: Archive diff
+    name: RClone ls update
     needs: cloudbridgejs2
     runs-on: ubuntu-latest
     steps:
@@ -108,7 +108,7 @@ jobs:
 
       - run: |
           git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/BiocStorage.git
-          mv reports/ BiocStorage/reports
+          mv reports BiocStorage/reports
           cd BiocStorage/
           for i in {1..3};
             do

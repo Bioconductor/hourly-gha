@@ -1,4 +1,4 @@
-name: Report instance usage
+name: Update JS2 compute reports
 
 on:
   workflow_dispatch: {}
