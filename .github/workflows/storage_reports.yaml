@@ -83,6 +83,9 @@ jobs:
           (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls osn:/bir190004-bucket01/biorefdata/bioconductor/v1/annotationhub | awk '{print $1" "$2}') > reports/ls/annotationhub-osn.ls
           (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls osn:/bir190004-bucket01/biorefdata/bioconductor/v1/experimenthub | awk '{print $1" "$2}') > reports/ls/experimenthub-osn.ls
 
+          # Handle files that are too big and get segmented in JS2 SWIFT
+          tail -n +2 BiocStorage/reports/ls/archive-js2.ls | sort | grep "^0" | xargs -i sh -c "sh .github/scripts/replace_cb_0_size.sh '{}' "js2:/archive.bioconductor.org" BiocStorage/reports/ls/archive-js2.ls"
+
       - run: |
           set -x
           git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/BiocStorage.git
@@ -103,10 +106,6 @@ jobs:
           cd ../
           
       - run: |
-          # Handle files that are too big and get segmented in JS2 SWIFT
-          comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/archive-js2.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-osn.ls | sort) > BiocStorage/reports/diffs/diff-archive-js2-not-osn.ls
-          cat BiocStorage/reports/diffs/diff-archive-js2-not-osn.ls | xargs -i sh -c "sh .github/scripts/replace_cb_0_size.sh '{}' "js2:/archive.bioconductor.org" BiocStorage/reports/ls/archive-js2.ls"
-
           comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/archive-s3.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-osn.ls | sort) > BiocStorage/reports/diffs/diff-archive-s3-not-osn.ls
           comm -1 -3 <(tail -n +2 BiocStorage/reports/ls/archive-s3.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-osn.ls | sort) > BiocStorage/reports/diffs/diff-archive-osn-not-s3.ls
           comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/archive-s3.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-js2.ls | sort) > BiocStorage/reports/diffs/diff-archive-s3-not-js2.ls
