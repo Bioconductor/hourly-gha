@@ -27,8 +27,11 @@ jobs:
           (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && cat reports/ls/archive-js2.ls) > reports/ls/tmparchive-js2.ls && mv reports/ls/tmparchive-js2.ls reports/ls/archive-js2.ls
 
       - run: |
+          set -x
           git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/BiocStorage.git
-          mv reports BiocStorage/reports
+          cp -r reports/* BiocStorage/reports/
+          head -n 1 reports/ls/archive-js2.ls
+          head -n 1 BiocStorage/reports/ls/archive-js2.ls
           cd BiocStorage/
           for i in {1..3};
             do
@@ -107,8 +110,9 @@ jobs:
           ls -lh
 
       - run: |
+          set -x
           git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/BiocStorage.git
-          mv reports BiocStorage/reports
+          cp -r reports/* BiocStorage/reports/
           cd BiocStorage/
           for i in {1..3};
             do
