@@ -1,6 +1,6 @@
 name: Report instance usage
 
-on: 
+on:
   workflow_dispatch: {}
   schedule:
     - cron: '*/60 * * * *'

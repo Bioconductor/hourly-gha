@@ -1,0 +1,124 @@
+name: Report RClone ls
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '*/60 * * * *'
+
+jobs:
+  cloudbridgejs2:
+    container:
+      image: python:3.10
+    name: Archive diff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add cloudbridge conf file
+        run: |
+          echo "$CLOUDBRIDGE_CONF" > ~/.cloudbridge
+        env:
+          CLOUDBRIDGE_CONF: ${{secrets.CLOUDBRIDGE_CONF}}
+
+      - uses: actions/checkout@v3
+
+      - run: |
+          set -x
+          python -m pip install "git+https://github.com/CloudVE/cloudbridge#egg=cloudbridge[full]"
+          mkdir -p reports/ls
+          python .github/scripts/cb_bucket_print.py -b archive.bioconductor.org -o reports/ls/archive-js2.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && cat reports/ls/archive-js2.ls) > reports/ls/tmparchive-js2.ls && mv reports/ls/tmparchive-js2.ls reports/ls/archive-js2.ls
+
+      - run: |
+          git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/BiocStorage.git
+          mv reports/ BiocStorage/reports
+          cd BiocStorage/
+          for i in {1..3};
+            do
+              git stash && \
+              git pull origin main || git reset --hard origin/main && \
+              git stash pop && \
+              git config --global --add safe.directory "$GITHUB_WORKSPACE" && \
+              git config user.name github-actions && \
+              git config user.email github-actions@github.com && \
+              git add . && \
+              git commit -m "Adding cloudbridge ls reports $(echo $(date +'%m-%d-%H-%M-%S'))"
+              git push && break || sleep 15;
+            done
+
+  rclonels:
+    container:
+      image: rclone/rclone:latest
+    name: Archive diff
+    needs: cloudbridgejs2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add rclone conf file
+        run: |
+          apk add --no-cache git
+          echo "$RCLONE_CONF" > ~/.rclone.conf
+        env:
+          RCLONE_CONF: ${{secrets.RCLONE_CONF}}
+
+      - uses: actions/checkout@v3
+
+      - run: |
+          set -x
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git pull origin main || git reset --hard origin/main
+          ls -lh
+          mkdir -p reports/ls
+          # rclone ls osn:/bir190004-bucket01 > reports/ls/osn.ls
+          # rclone ls awsopendata:/biorefdata/bioconductor/v1 > reports/ls/awsopendata.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls archive-s3:/archive.bioconductor.org | awk '{print $1" "$2}') > reports/ls/archive-s3.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls osn:/bir190004-bucket01/archive.bioconductor.org | awk '{print $1" "$2}') > reports/ls/archive-osn.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls experimenthubazure:/experimenthub | awk '{print $1" "$2}') > reports/ls/experimenthub-az.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls annotationhubazure:/annotationhub | awk '{print $1" "$2}') > reports/ls/annotationhub-az.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls awsopendata:/biorefdata/bioconductor/v1/annotationhub | awk '{print $1" "$2}') > reports/ls/annotationhub-awsod.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls awsopendata:/biorefdata/bioconductor/v1/experimenthub | awk '{print $1" "$2}') > reports/ls/experimenthub-awsod.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls awsopendata:/biorefdata/bioconductor/v1/packages | awk '{print $1" "$2}') > reports/ls/packages-awsod.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls osn:/bir190004-bucket01/biorefdata/bioconductor/v1/packages | awk '{print $1" "$2}') > reports/ls/packages-osn.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls osn:/bir190004-bucket01/biorefdata/bioconductor/v1/annotationhub | awk '{print $1" "$2}') > reports/ls/annotationhub-osn.ls
+          (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls osn:/bir190004-bucket01/biorefdata/bioconductor/v1/experimenthub | awk '{print $1" "$2}') > reports/ls/experimenthub-osn.ls
+
+          ls -lh
+          mkdir -p reports/diffs
+
+          # Handle files that are too big and get segmented in JS2 SWIFT
+          comm -2 -3 <(tail -n +2 reports/ls/archive-js2.ls | sort) <(tail -n +2 reports/ls/archive-osn.ls | sort) > reports/diffs/diff-archive-js2-not-osn.ls
+          cat reports/diffs/diff-archive-js2-not-osn.ls | xargs -i sh -c "sh .github/scripts/replace_cb_0_size.sh '{}' "js2:/archive.bioconductor.org" reports/ls/archive-js2.ls"
+
+          comm -2 -3 <(tail -n +2 reports/ls/archive-s3.ls | sort) <(tail -n +2 reports/ls/archive-osn.ls | sort) > reports/diffs/diff-archive-s3-not-osn.ls
+          comm -1 -3 <(tail -n +2 reports/ls/archive-s3.ls | sort) <(tail -n +2 reports/ls/archive-osn.ls | sort) > reports/diffs/diff-archive-osn-not-s3.ls
+          comm -2 -3 <(tail -n +2 reports/ls/archive-s3.ls | sort) <(tail -n +2 reports/ls/archive-js2.ls | sort) > reports/diffs/diff-archive-s3-not-js2.ls
+          comm -1 -3 <(tail -n +2 reports/ls/archive-s3.ls | sort) <(tail -n +2 reports/ls/archive-js2.ls | sort) > reports/diffs/diff-archive-js2-not-s3.ls
+          comm -2 -3 <(tail -n +2 reports/ls/archive-js2.ls | sort) <(tail -n +2 reports/ls/archive-osn.ls | sort) > reports/diffs/diff-archive-js2-not-osn.ls
+          comm -1 -3 <(tail -n +2 reports/ls/archive-js2.ls | sort) <(tail -n +2 reports/ls/archive-osn.ls | sort) > reports/diffs/diff-archive-osn-not-js2.ls
+          comm -2 -3 <(tail -n +2 reports/ls/experimenthub-az.ls | sort) <(tail -n +2 reports/ls/experimenthub-awsod.ls | sort) > reports/diffs/diff-experimenthub-az-not-awsod.ls
+          comm -1 -3 <(tail -n +2 reports/ls/experimenthub-az.ls | sort) <(tail -n +2 reports/ls/experimenthub-awsod.ls | sort) > reports/diffs/diff-experimenthub-awsod-not-az.ls
+          comm -2 -3 <(tail -n +2 reports/ls/annotationhub-az.ls | sort) <(tail -n +2 reports/ls/annotationhub-awsod.ls | sort) > reports/diffs/diff-annotationhub-az-not-awsod.ls
+          comm -1 -3 <(tail -n +2 reports/ls/annotationhub-az.ls | sort) <(tail -n +2 reports/ls/annotationhub-awsod.ls | sort) > reports/diffs/diff-annotationhub-awsod-not-az.ls
+          comm -2 -3 <(tail -n +2 reports/ls/experimenthub-az.ls | sort) <(tail -n +2 reports/ls/experimenthub-osn.ls | sort) > reports/diffs/diff-experimenthub-az-not-osn.ls
+          comm -1 -3 <(tail -n +2 reports/ls/experimenthub-az.ls | sort) <(tail -n +2 reports/ls/experimenthub-osn.ls | sort) > reports/diffs/diff-experimenthub-osn-not-az.ls
+          comm -2 -3 <(tail -n +2 reports/ls/annotationhub-az.ls | sort) <(tail -n +2 reports/ls/annotationhub-osn.ls | sort) > reports/diffs/diff-annotationhub-az-not-osn.ls
+          comm -1 -3 <(tail -n +2 reports/ls/annotationhub-az.ls | sort) <(tail -n +2 reports/ls/annotationhub-osn.ls | sort) > reports/diffs/diff-annotationhub-osn-not-az.ls
+          comm -2 -3 <(tail -n +2 reports/ls/packages-awsod.ls | sort) <(tail -n +2 reports/ls/packages-osn.ls | sort) > reports/diffs/diff-packages-awsod-not-osn.ls
+          comm -1 -3 <(tail -n +2 reports/ls/packages-awsod.ls | sort) <(tail -n +2 reports/ls/packages-osn.ls | sort) > reports/diffs/diff-packages-osn-not-awsod.ls
+
+          ls -lh
+
+      - run: |
+          git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/BiocStorage.git
+          mv reports/ BiocStorage/reports
+          cd BiocStorage/
+          for i in {1..3};
+            do
+              git stash && \
+              git pull origin main || git reset --hard origin/main && \
+              git stash pop && \
+              git config --global --add safe.directory "$GITHUB_WORKSPACE" && \
+              git config user.name github-actions && \
+              git config user.email github-actions@github.com && \
+              git add . && \
+              git commit -m "Adding rclone ls reports and diffs $(echo $(date +'%m-%d-%H-%M-%S'))"
+              git push && break || sleep 15;
+            done
