@@ -83,32 +83,6 @@ jobs:
           (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls osn:/bir190004-bucket01/biorefdata/bioconductor/v1/annotationhub | awk '{print $1" "$2}') > reports/ls/annotationhub-osn.ls
           (echo "Last updated on $(echo $(date +'%m-%d-%y-%H-%M-%S') '(%m-%d-%y-%H-%M-%S)')" && rclone ls osn:/bir190004-bucket01/biorefdata/bioconductor/v1/experimenthub | awk '{print $1" "$2}') > reports/ls/experimenthub-osn.ls
 
-          ls -lh
-          mkdir -p reports/diffs
-
-          # Handle files that are too big and get segmented in JS2 SWIFT
-          comm -2 -3 <(tail -n +2 reports/ls/archive-js2.ls | sort) <(tail -n +2 reports/ls/archive-osn.ls | sort) > reports/diffs/diff-archive-js2-not-osn.ls
-          cat reports/diffs/diff-archive-js2-not-osn.ls | xargs -i sh -c "sh .github/scripts/replace_cb_0_size.sh '{}' "js2:/archive.bioconductor.org" reports/ls/archive-js2.ls"
-
-          comm -2 -3 <(tail -n +2 reports/ls/archive-s3.ls | sort) <(tail -n +2 reports/ls/archive-osn.ls | sort) > reports/diffs/diff-archive-s3-not-osn.ls
-          comm -1 -3 <(tail -n +2 reports/ls/archive-s3.ls | sort) <(tail -n +2 reports/ls/archive-osn.ls | sort) > reports/diffs/diff-archive-osn-not-s3.ls
-          comm -2 -3 <(tail -n +2 reports/ls/archive-s3.ls | sort) <(tail -n +2 reports/ls/archive-js2.ls | sort) > reports/diffs/diff-archive-s3-not-js2.ls
-          comm -1 -3 <(tail -n +2 reports/ls/archive-s3.ls | sort) <(tail -n +2 reports/ls/archive-js2.ls | sort) > reports/diffs/diff-archive-js2-not-s3.ls
-          comm -2 -3 <(tail -n +2 reports/ls/archive-js2.ls | sort) <(tail -n +2 reports/ls/archive-osn.ls | sort) > reports/diffs/diff-archive-js2-not-osn.ls
-          comm -1 -3 <(tail -n +2 reports/ls/archive-js2.ls | sort) <(tail -n +2 reports/ls/archive-osn.ls | sort) > reports/diffs/diff-archive-osn-not-js2.ls
-          comm -2 -3 <(tail -n +2 reports/ls/experimenthub-az.ls | sort) <(tail -n +2 reports/ls/experimenthub-awsod.ls | sort) > reports/diffs/diff-experimenthub-az-not-awsod.ls
-          comm -1 -3 <(tail -n +2 reports/ls/experimenthub-az.ls | sort) <(tail -n +2 reports/ls/experimenthub-awsod.ls | sort) > reports/diffs/diff-experimenthub-awsod-not-az.ls
-          comm -2 -3 <(tail -n +2 reports/ls/annotationhub-az.ls | sort) <(tail -n +2 reports/ls/annotationhub-awsod.ls | sort) > reports/diffs/diff-annotationhub-az-not-awsod.ls
-          comm -1 -3 <(tail -n +2 reports/ls/annotationhub-az.ls | sort) <(tail -n +2 reports/ls/annotationhub-awsod.ls | sort) > reports/diffs/diff-annotationhub-awsod-not-az.ls
-          comm -2 -3 <(tail -n +2 reports/ls/experimenthub-az.ls | sort) <(tail -n +2 reports/ls/experimenthub-osn.ls | sort) > reports/diffs/diff-experimenthub-az-not-osn.ls
-          comm -1 -3 <(tail -n +2 reports/ls/experimenthub-az.ls | sort) <(tail -n +2 reports/ls/experimenthub-osn.ls | sort) > reports/diffs/diff-experimenthub-osn-not-az.ls
-          comm -2 -3 <(tail -n +2 reports/ls/annotationhub-az.ls | sort) <(tail -n +2 reports/ls/annotationhub-osn.ls | sort) > reports/diffs/diff-annotationhub-az-not-osn.ls
-          comm -1 -3 <(tail -n +2 reports/ls/annotationhub-az.ls | sort) <(tail -n +2 reports/ls/annotationhub-osn.ls | sort) > reports/diffs/diff-annotationhub-osn-not-az.ls
-          comm -2 -3 <(tail -n +2 reports/ls/packages-awsod.ls | sort) <(tail -n +2 reports/ls/packages-osn.ls | sort) > reports/diffs/diff-packages-awsod-not-osn.ls
-          comm -1 -3 <(tail -n +2 reports/ls/packages-awsod.ls | sort) <(tail -n +2 reports/ls/packages-osn.ls | sort) > reports/diffs/diff-packages-osn-not-awsod.ls
-
-          ls -lh
-
       - run: |
           set -x
           git clone https://${{secrets.REPORTS_GIT_TOKEN}}@github.com/Bioconductor/BiocStorage.git
@@ -123,6 +97,42 @@ jobs:
               git config user.name github-actions && \
               git config user.email github-actions@github.com && \
               git add . && \
-              git commit -m "Adding rclone ls reports and diffs $(echo $(date +'%m-%d-%H-%M-%S'))"
+              git commit -m "Adding rclone ls reports $(echo $(date +'%m-%d-%H-%M-%S'))"
+              git push && break || sleep 15;
+            done
+          cd ../
+          
+      - run: |
+          # Handle files that are too big and get segmented in JS2 SWIFT
+          comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/archive-js2.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-osn.ls | sort) > BiocStorage/reports/diffs/diff-archive-js2-not-osn.ls
+          cat BiocStorage/reports/diffs/diff-archive-js2-not-osn.ls | xargs -i sh -c "sh .github/scripts/replace_cb_0_size.sh '{}' "js2:/archive.bioconductor.org" BiocStorage/reports/ls/archive-js2.ls"
+
+          comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/archive-s3.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-osn.ls | sort) > BiocStorage/reports/diffs/diff-archive-s3-not-osn.ls
+          comm -1 -3 <(tail -n +2 BiocStorage/reports/ls/archive-s3.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-osn.ls | sort) > BiocStorage/reports/diffs/diff-archive-osn-not-s3.ls
+          comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/archive-s3.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-js2.ls | sort) > BiocStorage/reports/diffs/diff-archive-s3-not-js2.ls
+          comm -1 -3 <(tail -n +2 BiocStorage/reports/ls/archive-s3.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-js2.ls | sort) > BiocStorage/reports/diffs/diff-archive-js2-not-s3.ls
+          comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/archive-js2.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-osn.ls | sort) > BiocStorage/reports/diffs/diff-archive-js2-not-osn.ls
+          comm -1 -3 <(tail -n +2 BiocStorage/reports/ls/archive-js2.ls | sort) <(tail -n +2 BiocStorage/reports/ls/archive-osn.ls | sort) > BiocStorage/reports/diffs/diff-archive-osn-not-js2.ls
+          comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/experimenthub-az.ls | sort) <(tail -n +2 BiocStorage/reports/ls/experimenthub-awsod.ls | sort) > BiocStorage/reports/diffs/diff-experimenthub-az-not-awsod.ls
+          comm -1 -3 <(tail -n +2 BiocStorage/reports/ls/experimenthub-az.ls | sort) <(tail -n +2 BiocStorage/reports/ls/experimenthub-awsod.ls | sort) > BiocStorage/reports/diffs/diff-experimenthub-awsod-not-az.ls
+          comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/annotationhub-az.ls | sort) <(tail -n +2 BiocStorage/reports/ls/annotationhub-awsod.ls | sort) > BiocStorage/reports/diffs/diff-annotationhub-az-not-awsod.ls
+          comm -1 -3 <(tail -n +2 BiocStorage/reports/ls/annotationhub-az.ls | sort) <(tail -n +2 BiocStorage/reports/ls/annotationhub-awsod.ls | sort) > BiocStorage/reports/diffs/diff-annotationhub-awsod-not-az.ls
+          comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/experimenthub-az.ls | sort) <(tail -n +2 BiocStorage/reports/ls/experimenthub-osn.ls | sort) > BiocStorage/reports/diffs/diff-experimenthub-az-not-osn.ls
+          comm -1 -3 <(tail -n +2 BiocStorage/reports/ls/experimenthub-az.ls | sort) <(tail -n +2 BiocStorage/reports/ls/experimenthub-osn.ls | sort) > BiocStorage/reports/diffs/diff-experimenthub-osn-not-az.ls
+          comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/annotationhub-az.ls | sort) <(tail -n +2 BiocStorage/reports/ls/annotationhub-osn.ls | sort) > BiocStorage/reports/diffs/diff-annotationhub-az-not-osn.ls
+          comm -1 -3 <(tail -n +2 BiocStorage/reports/ls/annotationhub-az.ls | sort) <(tail -n +2 BiocStorage/reports/ls/annotationhub-osn.ls | sort) > BiocStorage/reports/diffs/diff-annotationhub-osn-not-az.ls
+          comm -2 -3 <(tail -n +2 BiocStorage/reports/ls/packages-awsod.ls | sort) <(tail -n +2 BiocStorage/reports/ls/packages-osn.ls | sort) > BiocStorage/reports/diffs/diff-packages-awsod-not-osn.ls
+          comm -1 -3 <(tail -n +2 BiocStorage/reports/ls/packages-awsod.ls | sort) <(tail -n +2 BiocStorage/reports/ls/packages-osn.ls | sort) > BiocStorage/reports/diffs/diff-packages-osn-not-awsod.ls
+          cd BiocStorage/
+          for i in {1..3};
+            do
+              git stash && \
+              git pull origin main || git reset --hard origin/main && \
+              git stash pop && \
+              git config --global --add safe.directory "$GITHUB_WORKSPACE" && \
+              git config user.name github-actions && \
+              git config user.email github-actions@github.com && \
+              git add . && \
+              git commit -m "Adding diff reports $(echo $(date +'%m-%d-%H-%M-%S'))"
               git push && break || sleep 15;
             done
